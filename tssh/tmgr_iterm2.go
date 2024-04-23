@@ -186,7 +186,7 @@ func (m *iterm2Mgr) openPanes(hosts []*sshHost) {
 	sessions := make([]iterm2.Session, len(matrix))
 	sessions[0] = session
 	for i := len(matrix) - 1; i > 0; i-- {
-		pane, err := session.SplitPane(iterm2.SplitPaneOptions{Vertical: false})
+		pane, err := session.SplitPane(iterm2.SplitPaneOptions{Vertical: true})
 		if err != nil {
 			warning("Failed to split pane: %v", err)
 			return
@@ -204,7 +204,7 @@ func (m *iterm2Mgr) openPanes(hosts []*sshHost) {
 			continue
 		}
 		for j := len(matrix[i]) - 1; j > 0; j-- {
-			pane, err := session.SplitPane(iterm2.SplitPaneOptions{Vertical: true})
+			pane, err := session.SplitPane(iterm2.SplitPaneOptions{Vertical: false})
 			if err != nil {
 				warning("Failed to split pane: %v", err)
 				return
