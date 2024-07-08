@@ -36,8 +36,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-
-	"golang.org/x/crypto/ssh"
 )
 
 const kMaxBufferSize = 32 * 1024
@@ -72,7 +70,7 @@ func getLatestTrzszVersion() (string, error) {
 	return release.TagName[1:], nil
 }
 
-func checkTrzszVersion(client *ssh.Client, cmd, name, version string) bool {
+func checkTrzszVersion(client sshClient, cmd, name, version string) bool {
 	session, err := client.NewSession()
 	if err != nil {
 		return false
@@ -85,16 +83,24 @@ func checkTrzszVersion(client *ssh.Client, cmd, name, version string) bool {
 	return strings.TrimSpace(string(output)) == fmt.Sprintf("%s (trzsz) go %s", name, version)
 }
 
-func checkInstalledVersion(client *ssh.Client, path, name, version string) bool {
+func pathJoin(path, name string) string {
 	// local may be Windows, remote may be Linux, so filepath.Join is not suitable here.
-	return checkTrzszVersion(client, fmt.Sprintf("%s/%s -v", path, name), name, version)
+	if strings.HasSuffix(path, "/") {
+		return path + name
+	}
+	return fmt.Sprintf("%s/%s", path, name)
 }
 
-func checkTrzszExecutable(client *ssh.Client, name, version string) bool {
+func checkInstalledVersion(client sshClient, path, name, version string) bool {
+	cmd := fmt.Sprintf("%s -v", pathJoin(path, name))
+	return checkTrzszVersion(client, cmd, name, version)
+}
+
+func checkTrzszExecutable(client sshClient, name, version string) bool {
 	return checkTrzszVersion(client, fmt.Sprintf("$SHELL -l -c '%s -v'", name), name, version)
 }
 
-func checkTrzszPathEnv(client *ssh.Client, version, path string) {
+func checkTrzszPathEnv(client sshClient, version, path string) {
 	trzExecutable := checkTrzszExecutable(client, "trz", version)
 	tszExecutable := checkTrzszExecutable(client, "tsz", version)
 	if !trzExecutable || !tszExecutable {
@@ -102,7 +108,34 @@ func checkTrzszPathEnv(client *ssh.Client, version, path string) {
 	}
 }
 
-func getRemoteServerOS(client *ssh.Client) (string, error) {
+func getRemoteUserHome(client sshClient) (string, error) {
+	session, err := client.NewSession()
+	if err != nil {
+		return "", err
+	}
+	defer session.Close()
+	output, err := session.Output("env")
+	if err != nil {
+		return "", err
+	}
+	scanner := bufio.NewScanner(strings.NewReader(string(output)))
+	for scanner.Scan() {
+		env := scanner.Text()
+		pos := strings.IndexRune(env, '=')
+		if pos <= 0 {
+			continue
+		}
+		if env[:pos] == "HOME" {
+			if home := strings.TrimSpace(env[pos+1:]); home != "" {
+				return home, nil
+			}
+			break
+		}
+	}
+	return "~", nil
+}
+
+func getRemoteServerOS(client sshClient) (string, error) {
 	session, err := client.NewSession()
 	if err != nil {
 		return "", err
@@ -123,7 +156,7 @@ func getRemoteServerOS(client *ssh.Client) (string, error) {
 	}
 }
 
-func getRemoteServerArch(client *ssh.Client) (string, error) {
+func getRemoteServerArch(client sshClient) (string, error) {
 	session, err := client.NewSession()
 	if err != nil {
 		return "", err
@@ -150,7 +183,7 @@ func getRemoteServerArch(client *ssh.Client) (string, error) {
 	}
 }
 
-func mkdirInstallPath(client *ssh.Client, path string) error {
+func mkdirInstallPath(client sshClient, path string) error {
 	session, err := client.NewSession()
 	if err != nil {
 		return err
@@ -273,7 +306,7 @@ func readTrzszBinary(path, version, svrOS, arch string) ([]byte, []byte, error) 
 	return extractTrzszBinary(gzr, version, svrOS, arch)
 }
 
-func uploadTrzszBinary(client *ssh.Client, path string, trz, tsz []byte) error {
+func uploadTrzszBinary(client sshClient, path string, trz, tsz []byte) error {
 	session, err := client.NewSession()
 	if err != nil {
 		return err
@@ -334,7 +367,6 @@ func uploadTrzszBinary(client *ssh.Client, path string, trz, tsz []byte) error {
 	}
 
 	go func() {
-		defer writer.Close()
 		defer progress.stopProgress()
 		if !checkTransferResponse() {
 			return
@@ -351,11 +383,15 @@ func uploadTrzszBinary(client *ssh.Client, path string, trz, tsz []byte) error {
 		if !writeBinaryContent(tsz) {
 			return
 		}
+		_ = writeTransferCommand("E\n")
 	}()
 
-	output, err := session.CombinedOutput(fmt.Sprintf("scp -tqr %s", path))
+	stderr, err := session.StderrPipe()
 	if err != nil {
-		msg := strings.TrimSpace(string(output))
+		return err
+	}
+	if err := session.Run(fmt.Sprintf("scp -tqr %s", path)); err != nil {
+		msg := readFromStream(stderr)
 		if msg != "" {
 			errMsg = append(errMsg, msg)
 		}
@@ -367,7 +403,7 @@ func uploadTrzszBinary(client *ssh.Client, path string, trz, tsz []byte) error {
 	return nil
 }
 
-func execInstallTrzsz(args *sshArgs, client *ssh.Client) {
+func execInstallTrzsz(args *sshArgs, client sshClient) {
 	version := args.TrzszVersion
 	if version == "" {
 		var err error
@@ -381,6 +417,15 @@ func execInstallTrzsz(args *sshArgs, client *ssh.Client) {
 	installPath := args.InstallPath
 	if installPath == "" {
 		installPath = "~/.local/bin/"
+	}
+
+	if strings.HasPrefix(installPath, "~/") {
+		home, err := getRemoteUserHome(client)
+		if err != nil {
+			toolsWarn("InstallTrzsz", "get remote user home path failed: %v", err)
+		} else {
+			installPath = pathJoin(home, installPath[2:])
+		}
 	}
 
 	trzInstalled := checkInstalledVersion(client, installPath, "trz", version)
