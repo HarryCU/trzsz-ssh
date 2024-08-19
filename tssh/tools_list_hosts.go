@@ -22,14 +22,32 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 
-package main
+package tssh
 
 import (
-	"os"
-
-	"github.com/trzsz/trzsz-ssh/tssh"
+	"encoding/json"
+	"fmt"
+	"runtime"
+	"strings"
 )
 
-func main() {
-	os.Exit(tssh.TsshMain(os.Args[1:]))
+func execListHosts() (int, bool) {
+	hosts := getAllHosts()
+
+	if hosts == nil {
+		hosts = []*sshHost{}
+	}
+	result, err := json.MarshalIndent(hosts, "", "  ")
+	if err != nil {
+		warning("json marshal indent failed: %v", err)
+		return 1, true
+	}
+
+	hostsJson := string(result)
+	if runtime.GOOS == "windows" {
+		hostsJson = strings.ReplaceAll(hostsJson, "\n", "\r\n")
+	}
+	fmt.Println(hostsJson)
+
+	return 0, true
 }

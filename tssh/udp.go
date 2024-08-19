@@ -35,6 +35,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+	"unicode"
 
 	"github.com/google/shlex"
 	"github.com/trzsz/tsshd/tsshd"
@@ -127,7 +128,7 @@ func (c *sshUdpClient) Close() error {
 	return c.client.Close()
 }
 
-func (c *sshUdpClient) NewSession() (sshSession, error) {
+func (c *sshUdpClient) NewSession() (SshSession, error) {
 	stream, err := c.newStream("session")
 	if err != nil {
 		return nil, err
@@ -704,14 +705,14 @@ func (c *sshUdpChannel) Stderr() io.ReadWriter {
 	return nil
 }
 
-func sshUdpLogin(args *sshArgs, param *sshParam, ss *sshClientSession, udpMode int) (*sshClientSession, error) {
+func sshUdpLogin(args *sshArgs, ss *sshClientSession, udpMode int) (*sshClientSession, error) {
 	defer ss.Close()
 
 	serverInfo, err := startTsshdServer(args, ss, udpMode)
 	if err != nil {
 		return nil, err
 	}
-	client, err := tsshd.NewClient(param.host, serverInfo)
+	client, err := tsshd.NewClient(ss.param.host, serverInfo)
 	if err != nil {
 		return nil, err
 	}
@@ -759,6 +760,7 @@ func sshUdpLogin(args *sshArgs, param *sshParam, ss *sshClientSession, udpMode i
 	if args.StdioForward != "" || args.NoCommand {
 		return &sshClientSession{
 			client: &udpClient,
+			param:  ss.param,
 			cmd:    ss.cmd,
 			tty:    ss.tty,
 		}, nil
@@ -778,6 +780,7 @@ func sshUdpLogin(args *sshArgs, param *sshParam, ss *sshClientSession, udpMode i
 		serverIn:  serverIn,
 		serverOut: serverOut,
 		serverErr: nil,
+		param:     ss.param,
 		cmd:       ss.cmd,
 		tty:       ss.tty,
 	}, nil
@@ -847,6 +850,37 @@ func getTsshdCommand(args *sshArgs, udpMode int) string {
 
 	if udpMode == kUdpModeKcp {
 		buf.WriteString(" --kcp")
+	}
+
+	if udpPort := getExOptionConfig(args, "UdpPort"); udpPort != "" {
+		ports := strings.FieldsFunc(udpPort, func(c rune) bool {
+			return unicode.IsSpace(c) || c == ',' || c == '-'
+		})
+		if len(ports) == 1 {
+			port, err := strconv.Atoi(ports[0])
+			if err != nil {
+				warning("UdpPort %s is invalid: %v", udpPort, err)
+			} else {
+				buf.WriteString(fmt.Sprintf(" --port %d", port))
+			}
+		} else if len(ports) == 2 {
+			for {
+				lowPort, err := strconv.Atoi(ports[0])
+				if err != nil {
+					warning("UdpPort %s is invalid: %v", udpPort, err)
+					break
+				}
+				highPort, err := strconv.Atoi(ports[1])
+				if err != nil {
+					warning("UdpPort %s is invalid: %v", udpPort, err)
+					break
+				}
+				buf.WriteString(fmt.Sprintf(" --port %d-%d", lowPort, highPort))
+				break // nolint:all
+			}
+		} else {
+			warning("UdpPort %s is invalid", udpPort)
+		}
 	}
 
 	return buf.String()
