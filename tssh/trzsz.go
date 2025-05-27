@@ -156,6 +156,23 @@ func enableTrzsz(args *sshArgs, ss *sshClientSession) error {
 		return fmt.Errorf("get terminal size failed: %v", err)
 	}
 
+	// custom configuration
+	defaultUploadPath := getExOptionConfig(args, "DefaultUploadPath")
+	if defaultUploadPath == "" {
+		defaultUploadPath = userConfig.defaultUploadPath
+	}
+	defaultDownloadPath := args.DownloadPath
+	if defaultDownloadPath == "" {
+		defaultDownloadPath = getExOptionConfig(args, "DefaultDownloadPath")
+		if defaultDownloadPath == "" {
+			defaultDownloadPath = userConfig.defaultDownloadPath
+		}
+	}
+	dragFileUploadCommand := getExOptionConfig(args, "DragFileUploadCommand")
+	if dragFileUploadCommand == "" {
+		dragFileUploadCommand = userConfig.dragFileUploadCommand
+	}
+
 	// create a TrzszFilter to support trzsz ( trz / tsz )
 	//
 	//   os.Stdin  ┌────────┐   os.Stdin   ┌─────────────┐   ServerIn   ┌────────┐
@@ -185,20 +202,9 @@ func enableTrzsz(args *sshArgs, ss *sshClientSession) error {
 	})
 
 	// setup trzsz config
-	trzszFilter.SetDefaultUploadPath(userConfig.defaultUploadPath)
-
-	downloadPath := args.DownloadPath
-	if downloadPath == "" {
-		downloadPath = userConfig.defaultDownloadPath
-	}
-	trzszFilter.SetDefaultDownloadPath(downloadPath)
-
-	dragFileUploadCommand := getExOptionConfig(args, "DragFileUploadCommand")
-	if dragFileUploadCommand == "" {
-		dragFileUploadCommand = userConfig.dragFileUploadCommand
-	}
+	trzszFilter.SetDefaultUploadPath(defaultUploadPath)
+	trzszFilter.SetDefaultDownloadPath(defaultDownloadPath)
 	trzszFilter.SetDragFileUploadCommand(dragFileUploadCommand)
-
 	trzszFilter.SetProgressColorPair(userConfig.progressColorPair)
 
 	// setup tunnel connect
