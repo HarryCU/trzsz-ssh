@@ -1,7 +1,7 @@
 /*
 MIT License
 
-Copyright (c) 2023-2024 The Trzsz SSH Authors.
+Copyright (c) 2023-2025 The Trzsz SSH Authors.
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -26,8 +26,10 @@ package tssh
 
 import (
 	"context"
+	"fmt"
 	"net"
 	"net/url"
+	"strconv"
 	"strings"
 )
 
@@ -85,4 +87,17 @@ func resolveDnsAddress(dns string) (string, string, error) {
 	dns = net.JoinHostPort(host, port)
 	return network, dns, nil
 
+}
+
+func lookupDnsSrv(name string) (string, string, error) {
+	_, addrs, err := net.LookupSRV("ssh", "tcp", name)
+	if err != nil {
+		return "", "", err
+	}
+	if len(addrs) == 0 {
+		return "", "", fmt.Errorf("no srv record")
+	}
+	host := strings.TrimRight(addrs[0].Target, ".")
+	port := addrs[0].Port
+	return host, strconv.Itoa(int(port)), nil
 }

@@ -1,7 +1,7 @@
 /*
 MIT License
 
-Copyright (c) 2023-2024 The Trzsz SSH Authors.
+Copyright (c) 2023-2025 The Trzsz SSH Authors.
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -102,9 +102,9 @@ func writeLanguage(path, language string) error {
 	if err != nil {
 		return err
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 	if err := ensureNewline(file); err != nil {
 		return err
 	}
-	return writeAll(file, []byte(fmt.Sprintf("Language = %s\n", language)))
+	return writeAll(file, fmt.Appendf(nil, "Language = %s\n", language))
 }

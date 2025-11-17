@@ -1,7 +1,7 @@
 /*
 MIT License
 
-Copyright (c) 2023-2024 The Trzsz SSH Authors.
+Copyright (c) 2023-2025 The Trzsz SSH Authors.
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -124,6 +124,8 @@ func (s *expectSender) decodeText(text string) []*expectSendText {
 			buf.WriteRune('\r')
 		case 'n':
 			buf.WriteRune('\n')
+		case 't':
+			buf.WriteRune('\t')
 		case '|':
 			texts = append(texts, s.newSendText(text[idx:i-1], buf.String()))
 			idx = i + 1
@@ -531,7 +533,7 @@ func execExpectInteractions(args *sshArgs, ss *sshClientSession) {
 
 	if ctx.Err() == context.DeadlineExceeded {
 		warning("expect timeout after %d seconds", expectTimeout)
-		_, _ = ss.serverIn.Write([]byte("\r")) // enter for shell prompt if timeout
+		ss.session.RedrawScreen()
 	}
 
 	ss.serverOut = outReader

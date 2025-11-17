@@ -1,7 +1,7 @@
 /*
 MIT License
 
-Copyright (c) 2023-2024 The Trzsz SSH Authors.
+Copyright (c) 2023-2025 The Trzsz SSH Authors.
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -36,6 +36,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -112,7 +113,7 @@ func getTsshConfigPath(forCreating bool) string {
 		return homePath
 	}
 	if forCreating {
-		if isFileExist(xdgConfigHome) {
+		if isDirExist(xdgConfigHome) {
 			cfgPath := filepath.Join(xdgConfigHome, "tssh")
 			if err := os.Mkdir(cfgPath, 0700); err != nil {
 				warning("create config path [%s] failed:", cfgPath, err)
@@ -136,7 +137,7 @@ func parseTsshConfig() {
 		warning("open %s failed: %v", path, err)
 		return
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 	debug("open %s success", path)
 
 	scanner := bufio.NewScanner(file)
@@ -297,7 +298,7 @@ func loadConfig(path string, system bool) *ssh_config.Config {
 		warning("open config [%s] failed: %v", path, err)
 		return nil
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 	debug("open config [%s] success", path)
 
 	var config *ssh_config.Config
@@ -558,7 +559,7 @@ func appendPromptHosts(hosts []*sshHost, cfgHosts ...*ssh_config.Host) []*sshHos
 				}
 				continue
 			}
-			if strings.ToLower(getConfig(alias, "HideHost")) == "yes" {
+			if strings.ToLower(getConfig(alias, "HideHost")) == "yes" { // treat as not extended config
 				continue
 			}
 			hosts = append(hosts, &sshHost{
@@ -580,15 +581,13 @@ func appendPromptHosts(hosts []*sshHost, cfgHosts ...*ssh_config.Host) []*sshHos
 func getGroupLabels(alias string) string {
 	var groupLabels []string
 	addGroupLabel := func(groupLabel string) {
-		for _, label := range groupLabels {
-			if label == groupLabel {
-				return
-			}
+		if slices.Contains(groupLabels, groupLabel) {
+			return
 		}
 		groupLabels = append(groupLabels, groupLabel)
 	}
 	for _, groupLabel := range getAllExConfig(alias, "GroupLabels") {
-		for _, label := range strings.Fields(groupLabel) {
+		for label := range strings.FieldsSeq(groupLabel) {
 			addGroupLabel(label)
 		}
 	}
@@ -704,7 +703,7 @@ func getPromptPageSize() int {
 func getPromptDetailItems() []string {
 	promptDetailItems := userConfig.promptDetailItems
 	if promptDetailItems == "" {
-		promptDetailItems = "Alias Host Port User GroupLabels IdentityFile ProxyCommand ProxyJump RemoteCommand"
+		promptDetailItems = "Alias Host Port User GroupLabels IdentityFile ProxyCommand ProxyJump RemoteCommand UdpMode TsshdPath"
 	}
 	return strings.Fields(promptDetailItems)
 }

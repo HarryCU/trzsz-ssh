@@ -1,7 +1,7 @@
 /*
 MIT License
 
-Copyright (c) 2023-2024 The Trzsz SSH Authors.
+Copyright (c) 2023-2025 The Trzsz SSH Authors.
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -121,13 +121,13 @@ func expandTokens(str string, args *sshArgs, param *sshParam, tokens string) (st
 			}
 			buf.WriteString(hostname)
 		case 'j':
-			if len(param.proxy) > 0 {
-				buf.WriteString(param.proxy[len(param.proxy)-1])
+			if len(param.proxies) > 0 {
+				buf.WriteString(param.proxies[len(param.proxies)-1])
 			}
 		case 'C':
 			hashStr := fmt.Sprintf("%s%s%s%s", getHostname(), param.host, param.port, param.user)
-			if len(param.proxy) > 0 && strings.ContainsRune(tokens, 'j') {
-				hashStr += param.proxy[len(param.proxy)-1]
+			if len(param.proxies) > 0 && strings.ContainsRune(tokens, 'j') {
+				hashStr += param.proxies[len(param.proxies)-1]
 			}
 			buf.WriteString(fmt.Sprintf("%x", sha1.Sum([]byte(hashStr))))
 		case 'k':

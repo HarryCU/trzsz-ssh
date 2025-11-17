@@ -1,7 +1,7 @@
 /*
 MIT License
 
-Copyright (c) 2023-2024 The Trzsz SSH Authors.
+Copyright (c) 2023-2025 The Trzsz SSH Authors.
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -231,7 +231,10 @@ func getTerminalSize() (int, int, error) {
 
 func onTerminalResize(setTerminalSize func(int, int)) {
 	go func() {
-		columns, rows, _ := getTerminalSize()
+		columns, rows, err := getTerminalSize()
+		if err == nil {
+			setTerminalSize(columns, rows)
+		}
 		for {
 			time.Sleep(time.Second)
 			width, height, err := getTerminalSize()
@@ -239,8 +242,7 @@ func onTerminalResize(setTerminalSize func(int, int)) {
 				continue
 			}
 			if columns != width || rows != height {
-				columns = width
-				rows = height
+				columns, rows = width, height
 				setTerminalSize(width, height)
 			}
 		}

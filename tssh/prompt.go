@@ -1,7 +1,7 @@
 /*
 MIT License
 
-Copyright (c) 2023-2024 The Trzsz SSH Authors.
+Copyright (c) 2023-2025 The Trzsz SSH Authors.
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -30,6 +30,7 @@ import (
 	"io"
 	"net"
 	"os"
+	"reflect"
 	"strings"
 	"time"
 
@@ -469,8 +470,10 @@ func (p *sshPrompt) userConfirm(buf []byte) bool {
 }
 
 func (p *sshPrompt) wrapStdin() {
-	defer p.selector.Stdin.Close()
-	defer p.pipeOut.Close()
+	defer func() {
+		_ = p.pipeOut.Close()
+		_ = p.selector.Stdin.Close()
+	}()
 	buffer := make([]byte, 100)
 	if strings.ToLower(userConfig.promptDefaultMode) == "search" {
 		p.search = true
@@ -565,6 +568,15 @@ func chooseAlias(keywords string) (string, bool, error) {
 
 	theme := getPromptTheme()
 	termMgr := getTerminalManager()
+	funcMap := promptui.FuncMap
+	funcMap["getExConfig"] = getExConfig
+	funcMap["hasField"] = func(obj any, field string) bool {
+		v := reflect.ValueOf(obj)
+		if v.Kind() == reflect.Pointer {
+			v = v.Elem()
+		}
+		return v.FieldByName(field).IsValid()
+	}
 
 	pipeIn, pipeOut := io.Pipe()
 	prompt := sshPrompt{
@@ -581,6 +593,7 @@ func chooseAlias(keywords string) (string, bool, error) {
 				HideLabel:       theme.HideLabel,
 				ItemsRenderer:   theme.ItemsRenderer,
 				DetailsRenderer: theme.DetailsRenderer,
+				FuncMap:         funcMap,
 			},
 			Size:         getPromptPageSize(),
 			Searcher:     searcher,
@@ -615,19 +628,10 @@ func chooseAlias(keywords string) (string, bool, error) {
 }
 
 func fastLookupHost(host string) bool {
-	errch := make(chan error, 1)
-	go func() {
-		defer close(errch)
-		_, err := net.LookupHost(host)
-		errch <- err
-	}()
-
-	select {
-	case <-time.After(200 * time.Millisecond):
-		return false
-	case err := <-errch:
-		return err == nil
-	}
+	_, err := doWithTimeout(func() ([]string, error) {
+		return net.LookupHost(host)
+	}, 200*time.Millisecond)
+	return err == nil
 }
 
 func predictDestination(dest string) (string, bool, error) {

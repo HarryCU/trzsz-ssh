@@ -1,4 +1,4 @@
-# trzsz-ssh ( tssh ) - an openssh client alternative
+## trzsz-ssh ( tssh ) - an ssh client alternative that meets your needs
 
 [![MIT License](https://img.shields.io/badge/license-MIT-green.svg?style=flat)](https://choosealicense.com/licenses/mit/)
 [![GitHub Release](https://img.shields.io/github/v/release/trzsz/trzsz-ssh)](https://github.com/trzsz/trzsz-ssh/releases)
@@ -7,7 +7,9 @@
 
 trzsz-ssh ( tssh ) is an ssh client designed as a drop-in replacement for the openssh client. It aims to provide complete compatibility with openssh, mirroring all its features, while also offering additional useful features not found in the openssh client.
 
-## Basic Features
+trzsz-ssh ( tssh ) with [tsshd](https://github.com/trzsz/tsshd) also supports intermittent connectivity, allows roaming, and can be used on high-latency links such as cellular data connections, unstable Wi-Fi, etc.
+
+### Basic Features
 
 trzsz-ssh ( tssh ) works exactly like the openssh client. The following common features have been implemented:
 
@@ -15,18 +17,18 @@ trzsz-ssh ( tssh ) works exactly like the openssh client. The following common f
 | :------------: | :----------------------------------------------------------------------------------------------------------------: |
 |     Cipher     |                                                   `-c` `Ciphers`                                                   |
 |   Pseudo TTY   |                                               `-t` `-T` `RequestTTY`                                               |
-|    Network     |                                             `-4` `-6` `AddressFamily`                                              |
 |   SSH Proxy    |                                        `-J` `-W` `ProxyJump` `ProxyCommand`                                        |
+|    Network     |                                     `-4` `-6` `AddressFamily` `ConnectTimeout`                                     |
 |  Multiplexing  |                                   `ControlMaster` `ControlPath` `ControlPersist`                                   |
 |    Command     |                               `RemoteCommand`, `LocalCommand`, `PermitLocalCommand`                                |
-|   SSH Agent    |                              `-a` `-A` `ForwardAgent` `IdentityAgent` `SSH_AUTH_SOCK`                              |
 |  X11 Forward   |                        `-x` `-X` `-Y` `ForwardX11` `ForwardX11Trusted` `ForwardX11Timeout`                         |
 |  Known Hosts   |                        `UserKnownHostsFile` `GlobalKnownHostsFile` `StrictHostKeyChecking`                         |
+|   SSH Agent    |                     `-a` `-A` `ForwardAgent` `IdentityAgent` `IdentitiesOnly` `SSH_AUTH_SOCK`                      |
 |  Basic Login   |                   `-l` `-p` `-i` `-F` `HostName` `Port` `User` `IdentityFile` `SendEnv` `SetEnv`                   |
-| Authentication |                   `PubkeyAuthentication` `PasswordAuthentication` `KbdInteractiveAuthentication`                   |
+| Authentication |       `PubkeyAuthentication` `PasswordAuthentication` `KbdInteractiveAuthentication` `GSSAPIAuthentication`        |
 |  Port Forward  | `-g` `-f` `-N` `-L` `-R` `-D` `LocalForward` `RemoteForward` `DynamicForward` `GatewayPorts` `ClearAllForwardings` |
 
-## Extra Features
+### Extra Features
 
 trzsz-ssh ( tssh ) offers additional useful features:
 
@@ -42,13 +44,14 @@ trzsz-ssh ( tssh ) offers additional useful features:
 |     [Remember Password](README.en.md#remember-password)     |      [记住密码](README.cn.md#%E8%AE%B0%E4%BD%8F%E5%AF%86%E7%A0%81)       |
 |  [Custom Configuration](README.en.md#custom-configuration)  |      [个性配置](README.cn.md#%E4%B8%AA%E6%80%A7%E9%85%8D%E7%BD%AE)       |
 |    [Comments of Config](README.en.md#comments-of-config)    |      [配置注释](README.cn.md#%E9%85%8D%E7%BD%AE%E6%B3%A8%E9%87%8A)       |
+|   [Wayland Integration](README.en.md#wayland-integration)   |         [Wayland 集成](README.cn.md#wayland-%E9%9B%86%E6%88%90)          |
 | [Clipboard Integration](README.en.md#clipboard-integration) | [剪贴板集成](README.cn.md#%E5%89%AA%E8%B4%B4%E6%9D%BF%E9%9B%86%E6%88%90) |
 |        [Other Features](README.en.md#other-features)        |      [其他功能](README.cn.md#%E5%85%B6%E4%BB%96%E5%8A%9F%E8%83%BD)       |
-|              [UDP Mode](README.en.md#udp-mode)              |             [UDP 模式](README.cn.md#udp-%E6%A8%A1%E5%BC%8F)              |
+|         [UDP Mode ( mosh )](README.en.md#udp-mode)          |         [UDP 模式 ( mosh )](README.cn.md#udp-%E6%A8%A1%E5%BC%8F)         |
 
-## Installation
+### Installation
 
-- Install with [scoop](https://scoop.sh/) / [winget](https://learn.microsoft.com/en-us/windows/package-manager/winget/) / [choco](https://community.chocolatey.org/) on Windows
+- Install with scoop / winget / choco on Windows
 
   <details><summary><code>scoop install tssh</code> / <code>winget install tssh</code> / <code>choco install tssh</code></summary>
 
@@ -66,12 +69,11 @@ trzsz-ssh ( tssh ) offers additional useful features:
 
   </details>
 
-- Install with [homebrew](https://brew.sh/) on MacOS
+- Install with Homebrew on MacOS
 
   <details><summary><code>brew install trzsz-ssh</code></summary>
 
   ```sh
-  brew update
   brew install trzsz-ssh
   ```
 
@@ -133,7 +135,7 @@ trzsz-ssh ( tssh ) offers additional useful features:
 
   </details>
 
-- Install with [yay](https://github.com/Jguer/yay) on ArchLinux
+- Install with yay on ArchLinux
 
   <details><summary><code>yay -S tssh</code></summary>
 
@@ -144,7 +146,17 @@ trzsz-ssh ( tssh ) offers additional useful features:
 
   </details>
 
-- Install with Go ( Requires go 1.21 or later )
+- Install with Chromebrew on ChromeOS
+
+  <details><summary><code>crew install tssh</code></summary>
+
+  ```sh
+  crew install tssh
+  ```
+
+  </details>
+
+- Install with Go ( Requires go 1.25 or later )
 
   <details><summary><code>go install github.com/trzsz/trzsz-ssh/cmd/tssh@latest</code></summary>
 
@@ -156,7 +168,7 @@ trzsz-ssh ( tssh ) offers additional useful features:
 
   </details>
 
-- Build from source ( Requires go 1.21 or later )
+- Build from source ( Requires go 1.25 or later )
 
   <details><summary><code>sudo make install</code></summary>
 
@@ -171,7 +183,7 @@ trzsz-ssh ( tssh ) offers additional useful features:
 
 - Download from the [GitHub Releases](https://github.com/trzsz/trzsz-ssh/releases), unzip and add to `PATH` environment.
 
-## Development
+### Development
 
 The `github.com/trzsz/trzsz-ssh/tssh` can be used as a library, for example:
 
@@ -209,7 +221,7 @@ func main() {
 }
 ```
 
-## Contributing
+### Contributing
 
 Welcome and thank you for considering contributing. We appreciate all forms of support, from coding and testing to documentation and CI/CD improvements.
 
@@ -221,7 +233,7 @@ Welcome and thank you for considering contributing. We appreciate all forms of s
 
 - Once you are happy with your changes, please submit a pull request.
 
-## Screenshot
+### Screenshot
 
 ![tssh tiny](https://trzsz.github.io/images/tssh_tiny.gif)
 
@@ -233,10 +245,10 @@ Welcome and thank you for considering contributing. We appreciate all forms of s
 
 ![tssh batch](https://trzsz.github.io/images/tssh_batch.gif)
 
-## Contact
+### Contact
 
 Feel free to email the author <lonnywong@qq.com>, or create an [issue](https://github.com/trzsz/trzsz-ssh/issues). Welcome to join the QQ group: 318578930.
 
-## Sponsor
+### Sponsor
 
 [❤️ Sponsor trzsz ❤️](https://github.com/trzsz), buy the author a drink 🍺 ? Thank you for your support!

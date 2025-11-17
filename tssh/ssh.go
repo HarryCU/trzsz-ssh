@@ -1,7 +1,7 @@
 /*
 MIT License
 
-Copyright (c) 2023-2024 The Trzsz SSH Authors.
+Copyright (c) 2023-2025 The Trzsz SSH Authors.
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -120,6 +120,12 @@ type SshSession interface {
 	// SendRequest sends an out-of-band channel request on the SSH channel
 	// underlying the session.
 	SendRequest(name string, wantReply bool, payload []byte) (bool, error)
+
+	// RedrawScreen clear and redraw the screen right now.
+	RedrawScreen()
+
+	// GetTerminalWidth returns the width of the terminal
+	GetTerminalWidth() int
 }
 
 // SshArgs specifies the arguments to log in to the remote server.
@@ -214,14 +220,43 @@ type sshClientSession struct {
 
 func (s *sshClientSession) Close() {
 	if s.serverIn != nil {
-		s.serverIn.Close()
+		_ = s.serverIn.Close()
 	}
 	if s.session != nil {
-		s.session.Close()
+		_ = s.session.Close()
 	}
 	if s.client != nil {
-		s.client.Close()
+		_ = s.client.Close()
 	}
+}
+
+type sshSessionWrapper struct {
+	ssh.Session
+	height int
+	width  int
+}
+
+func (s *sshSessionWrapper) RequestPty(term string, height, width int, termmodes ssh.TerminalModes) error {
+	s.height, s.width = height, width
+	return s.Session.RequestPty(term, height, width, termmodes)
+}
+
+func (s *sshSessionWrapper) WindowChange(height, width int) error {
+	s.height, s.width = height, width
+	return s.Session.WindowChange(height, width)
+}
+
+func (s *sshSessionWrapper) RedrawScreen() {
+	if s.height <= 0 || s.width <= 0 {
+		return
+	}
+	height, width := s.height, s.width
+	_ = s.WindowChange(height, width+1)
+	_ = s.WindowChange(height, width)
+}
+
+func (s *sshSessionWrapper) GetTerminalWidth() int {
+	return s.width
 }
 
 type sshClientWrapper struct {
@@ -233,26 +268,27 @@ func (c *sshClientWrapper) Wait() error {
 }
 
 func (c *sshClientWrapper) Close() error {
-	return c.client.Close()
+	_, err := doWithTimeout(func() (int, error) { return 0, c.client.Close() }, 300*time.Millisecond)
+	return err
 }
 
 func (c *sshClientWrapper) NewSession() (SshSession, error) {
-	return c.client.NewSession()
+	session, err := c.client.NewSession()
+	if err != nil {
+		return nil, err
+	}
+	return &sshSessionWrapper{*session, 0, 0}, nil
 }
 
 func (c *sshClientWrapper) DialTimeout(network, addr string, timeout time.Duration) (conn net.Conn, err error) {
-	done := make(chan struct{}, 1)
-	go func() {
-		defer close(done)
-		conn, err = c.client.Dial(network, addr)
-		done <- struct{}{}
-	}()
-	select {
-	case <-time.After(timeout):
-		err = fmt.Errorf("dial [%s] timeout", addr)
-	case <-done:
+	if timeout > 0 {
+		conn, err = doWithTimeout(func() (net.Conn, error) {
+			return c.client.Dial(network, addr)
+		}, timeout)
+		return
+	} else {
+		return c.client.Dial(network, addr)
 	}
-	return
 }
 
 func (c *sshClientWrapper) Listen(network, addr string) (net.Listener, error) {

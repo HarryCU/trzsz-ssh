@@ -1,7 +1,7 @@
 /*
 MIT License
 
-Copyright (c) 2023-2024 The Trzsz SSH Authors.
+Copyright (c) 2023-2025 The Trzsz SSH Authors.
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -32,7 +32,7 @@ import (
 )
 
 func isRemoteSshEnv(pid int) bool {
-	for i := 0; i < 1000; i++ {
+	for range 1000 {
 		kinfo, err := unix.SysctlKinfoProc("kern.proc.pid", pid)
 		if err != nil {
 			return false

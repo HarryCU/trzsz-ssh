@@ -1,7 +1,7 @@
 /*
 MIT License
 
-Copyright (c) 2023-2024 The Trzsz SSH Authors.
+Copyright (c) 2023-2025 The Trzsz SSH Authors.
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -35,8 +35,6 @@ import (
 	"github.com/mattn/go-isatty"
 	"github.com/trzsz/go-arg"
 )
-
-const kTsshVersion = "0.1.22"
 
 func background(args *sshArgs, dest string) (bool, error) {
 	if v := os.Getenv("TRZSZ-SSH-BACKGROUND"); v == "TRUE" {
@@ -106,6 +104,14 @@ func cleanupOnExit() {
 	}
 }
 
+var onCloseFuncs []func()
+
+func cleanupOnClose() {
+	for i := len(onCloseFuncs) - 1; i >= 0; i-- {
+		onCloseFuncs[i]()
+	}
+}
+
 var afterLoginFuncs []func()
 
 func cleanupAfterLogin() {
@@ -155,7 +161,7 @@ func TsshMain(argv []string) int {
 	}
 
 	// execute local tools if necessary
-	if code, quit := execLocalTools(argv, &args); quit {
+	if code, quit := execLocalTools(&args); quit {
 		return code
 	}
 
@@ -211,10 +217,13 @@ func sshStart(args *sshArgs) (int, error) {
 	}
 	defer ss.Close()
 
+	// cleanup on close
+	defer cleanupOnClose()
+
 	// stdio forward
 	if args.StdioForward != "" {
 		var wg *sync.WaitGroup
-		wg, err = stdioForward(ss.client, args.StdioForward)
+		wg, err = stdioForward(args, ss.client, args.StdioForward)
 		if err != nil {
 			return 11, err
 		}
@@ -241,6 +250,11 @@ func sshStart(args *sshArgs) (int, error) {
 	// execute remote tools if necessary
 	if code, quit := execRemoteTools(args, ss); quit {
 		return code, nil
+	}
+
+	// enable waypipe
+	if err := enableWaypipe(args, ss); err != nil {
+		warning("waypipe may not be working properly: %v", err)
 	}
 
 	// run command or start shell

@@ -1,7 +1,7 @@
 /*
 MIT License
 
-Copyright (c) 2023-2024 The Trzsz SSH Authors.
+Copyright (c) 2023-2025 The Trzsz SSH Authors.
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -32,6 +32,11 @@ import (
 )
 
 func TestDNS(t *testing.T) {
+	oriWarning := warning
+	warning = func(string, ...any) {}
+	defer func() {
+		warning = oriWarning
+	}()
 
 	assert := assert.New(t)
 	assertDestEqual := func(waitParseDns, expectedDns string) {

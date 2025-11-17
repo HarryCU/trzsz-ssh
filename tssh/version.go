@@ -24,26 +24,4 @@ SOFTWARE.
 
 package tssh
 
-import (
-	"fmt"
-
-	"github.com/charmbracelet/lipgloss"
-)
-
-func execEncodeSecret() (int, bool) {
-	secret := promptPassword("Password or secret to be encoded", "",
-		&inputValidator{func(secret string) error {
-			if secret == "" {
-				return fmt.Errorf("empty password or secret")
-			}
-			return nil
-		}})
-	encoded, err := encodeSecret([]byte(secret))
-	if err != nil {
-		toolsErrorExit("encode secret failed: %v", err)
-	}
-	fmt.Printf("%s%s%s\r\n\r\n",
-		lipgloss.NewStyle().Foreground(greenColor).Render("Encoded secret for configuration"),
-		lipgloss.NewStyle().Faint(true).Render(": "), encoded)
-	return 0, true
-}
+const kTsshVersion = "0.1.23"
